@@ -24,18 +24,6 @@ function generate_go_client() {
     goswagger generate client --template=stratoscale -f swagger.yaml
 }
 
-function generate_python_client() {
-    local dest="${BUILD_FOLDER}"
-    rm -rf "${dest}"/assisted-service-client/*
-
-    SWAGGER_FILE="${__root}"/swagger.yaml \
-        OUTPUT="${dest}"/assisted-service-client/ \
-        "${__root}"/tools/generate_python_client.sh
-    cd "${dest}"/assisted-service-client/ && \
-        python3 "${__root}"/tools/client_package_initializer.py "${dest}"/assisted-service-client/ https://github.com/openshift/assisted-service
-    cp "${dest}"/assisted-service-client/dist/assisted-service-client-*.tar.gz "${dest}"
-}
-
 function remove_dashes_and_dots() {
     for f in models/*.go ; do
         sed -i 's/Dash//g;s/Dot//g' $f
@@ -57,12 +45,22 @@ function validate_swagger_file() {
     fi
 }
 
+function generate_python_client() {
+  base_dir=assisted_swarm_client
+  output_dir=${__root}/${base_dir}
+  mkdir -p ${output_dir}
+  /bin/rm -rf ${output_dir}/* || /bin/true
+  ${CONTAINER_COMMAND} build -f hack/Dockerfile.python-client-generate . -t python-generator:latest && ${CONTAINER_COMMAND} run --user ${UID}:${UID} \
+   -v ${output_dir}:/assisted_swarm_client --env SWAGGER_FILE=swagger.yaml --env OUTPUT=/assisted_swarm_client --env BASE_DIR=${base_dir} python-generator:latest
+}
+
 function generate_from_swagger() {
     lint_swagger
     generate_go_client
     generate_go_server
     validate_swagger_file
     remove_dashes_and_dots
+    generate_python_client
 }
 
 

@@ -4,6 +4,8 @@ build-container-image: assisted-swarm-build
 volumes:
   # cache
   - $HOME/.cache/go-build:/go/pkg/mod
+  # Registry credentials
+  - $HOME/.docker/:$HOME/.docker
 
 containers:
   assisted-swarm-build: Dockerfile.assisted-swarm-build
