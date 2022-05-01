@@ -24,6 +24,8 @@ from containerconfig import (
 from agent import SwarmAgentConfig
 from cluster import Cluster, ClusterConfig
 from swarmkubecache import SwarmKubeCache
+from swarm_api import new_swarm_client
+from combined_agent import CombinedAgent
 
 script_dir = Path(__file__).parent
 
@@ -54,6 +56,8 @@ class Swarm(RetryingStateMachine):
         now_second = int(time.time())
         self.identifier = f"swarm-{now_second}"
         self.swarm_dir = global_swarm_directory / self.identifier
+        self.swarm_client = new_swarm_client()
+        self.combined_agent = CombinedAgent(executor=self.executor, swarm_client=self.swarm_client)
 
         super().__init__(
             initial_state="Initializing",
@@ -375,12 +379,14 @@ class Swarm(RetryingStateMachine):
         self.kube_cache = SwarmKubeCache(self.kube_cache_done)
         self.kube_cache_thread = threading.Thread(target=self.kube_cache.monitor, args=())
         self.kube_cache_thread.start()
+        self.combined_agent.spawn()
 
         return next_state
 
     def finalize(self):
         self.kube_cache_done.set()
         self.kube_cache_thread.join()
+        self.combined_agent.stop()
 
     def launch_cluster(
         self,
@@ -433,6 +439,7 @@ class Swarm(RetryingStateMachine):
                 k8s_api_server_url=self.k8s_api_server_url,
                 kube_cache=self.kube_cache,
                 num_locks=num_locks,
+                swarm_client=self.swarm_client,
             ),
         )
 

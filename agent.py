@@ -6,6 +6,7 @@ import subprocess
 import uuid
 import json
 import tempfile
+import waiting
 from pathlib import Path
 from typing import List
 
@@ -16,6 +17,8 @@ from statemachine import RetryingStateMachine
 from swarmexecutor import SwarmExecutor
 from swarmkubecache import SwarmKubeCache
 from withcontainerconfigs import WithContainerConfigs
+import assisted_swarm_client.assisted_swarm as assisted_swarm
+from assisted_swarm_client.assisted_swarm import SwarmApi, AgentStatus
 
 
 SCRIPT_DIR = Path(__file__).parent
@@ -44,6 +47,7 @@ class SwarmAgentConfig:
     k8s_api_server_url: str
     kube_cache: SwarmKubeCache
     num_locks: int
+    swarm_client: SwarmApi
 
 
 @dataclass
@@ -239,6 +243,18 @@ class Agent(RetryingStateMachine, WithContainerConfigs):
 
         return self.state
 
+    def wait_for_completion(self, id):
+        def has_agent_completed():
+            response = self.swarm_agent_config.swarm_client.get_agent(id)
+            return response.status == AgentStatus.TERMINATED
+        try:
+            waiting.wait(has_agent_completed,
+                         sleep_seconds=30,
+                         timeout_seconds=10000)
+            return True
+        except waiting.TimeoutExpired:
+            return False
+
     def run_agent(self, next_state):
         # We place the hosts file under /var/log because it's mounted for the installer
         with tempfile.NamedTemporaryFile(
@@ -247,51 +263,28 @@ class Agent(RetryingStateMachine, WithContainerConfigs):
             cluster_hosts_file.write(json.dumps(self.cluster_agent_config.cluster_hosts))
             cluster_hosts_file_path = cluster_hosts_file.name
 
-        agent_environment = {
-            "CONTAINERS_CONF": str(self.container_config),
-            "CONTAINERS_STORAGE_CONF": str(self.container_storage_conf),
-            "PULL_SECRET_TOKEN": self.swarm_agent_config.pull_secret,
-            "DRY_ENABLE": "true",
-            "DRY_HOST_ID": self.host_id,
-            "DRY_FORCED_MAC_ADDRESS": self.cluster_agent_config.mac_address,
-            "DRY_FAKE_REBOOT_MARKER_PATH": str(self.fake_reboot_marker_path),
-            "DRY_FORCED_HOSTNAME": self.cluster_agent_config.machine_hostname,
+        new_agent_params = assisted_swarm.NewAgentParams(
+            service_url=self.service_url,
+            infra_env_id=self.infraenv_id,
+            agent_version=self.swarm_agent_config.agent_image_path,
+            cacert=str(self.swarm_agent_config.ca_cert_path),
+            containers_conf=str(self.container_config),
+            containers_storage_conf=str(self.container_storage_conf),
+            pull_secret=self.swarm_agent_config.pull_secret,
+            dry_forced_host_id=self.host_id,
+            dry_forced_mac_address=self.cluster_agent_config.mac_address,
+            dry_fake_reboot_marker_path=str(self.fake_reboot_marker_path),
+            dry_forced_hostname=self.cluster_agent_config.machine_hostname,
             # The installer needs to know all the hostnames in the cluster
-            "DRY_CLUSTER_HOSTS_PATH": cluster_hosts_file_path,
-            "DRY_FORCED_HOST_IPV4": self.cluster_agent_config.machine_ip,
-        }
+            dry_cluster_hosts_path=cluster_hosts_file_path,
+            dry_forced_host_ipv4=self.cluster_agent_config.machine_ip,
+        )
 
-        agent_command = [
-            str(self.swarm_agent_config.agent_binary),
-            "--url",
-            self.service_url,
-            "--infra-env-id",
-            self.infraenv_id,
-            "--agent-version",
-            self.swarm_agent_config.agent_image_path,
-            "--insecure=true",
-            "--cacert",
-            str(self.swarm_agent_config.ca_cert_path),
-        ]
-
-        with self.agent_stdout_path.open("ab") as agent_stdout_file:
-            with self.agent_stderr_path.open("ab") as agent_stderr_file:
-                agent_stdout_file.write(
-                    f"Running agent with command: {agent_command} and env {agent_environment}".encode("utf-8")
-                )
-                agent_process = self.swarm_agent_config.executor.Popen(
-                    self.swarm_agent_config.executor.prepare_sudo_command(agent_command, agent_environment),
-                    env={**os.environ, **agent_environment},
-                    stdin=subprocess.DEVNULL,
-                    stdout=agent_stdout_file,
-                    stderr=agent_stderr_file,
-                )
-
-        if agent_process.wait() != 0:
-            self.logging.error(f"Agent exited with non-zero exit code {agent_process.returncode}")
-            return self.state
-
-        return next_state
+        response = self.swarm_agent_config.swarm_client.create_new_agent(new_agent_params=new_agent_params)
+        try:
+            return next_state if self.wait_for_completion(response.id) else self.state
+        finally:
+            self.swarm_agent_config.swarm_client.delete_agent(response.id)
 
     def done(self, _):
         return self.state

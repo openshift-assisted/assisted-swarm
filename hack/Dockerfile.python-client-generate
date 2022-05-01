@@ -1,0 +1,5 @@
+FROM quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
+COPY ./swagger.yaml .
+COPY ./hack/generate_python_client.sh .
+RUN chmod +x ./generate_python_client.sh
+ENTRYPOINT ["/generate_python_client.sh"]
