@@ -18,7 +18,7 @@ type toolFactory struct {
 	log           logrus.FieldLogger
 }
 
-func (t *toolFactory) Create(agentConfig *agentConfig.AgentConfig, stepType models.StepType, command string, args []string) (runner commands.Runner, err error) {
+func (t *toolFactory) Create(agentConfig *agentConfig.AgentConfig, stepType models.StepType, args []string) (runner commands.Runner, err error) {
 	switch stepType {
 	case models.StepTypeInventory:
 		runner, err = runners.NewInventoryRunner(t.subprocessCfg, args)

@@ -41,7 +41,7 @@ func (a *nextStepRunnerFactory) parse(args []string) (*models.NextStepCmdRequest
 	return &ret, nil
 }
 
-func (n *nextStepRunnerFactory) Create(agentCfg *agentConfig.AgentConfig, command string, args []string) (commands.Runner, error) {
+func (n *nextStepRunnerFactory) Create(agentCfg *agentConfig.AgentConfig, args []string) (commands.Runner, error) {
 	req, err := n.parse(args)
 	if err != nil {
 		return nil, errors.Wrapf(err, "parse args %+v", args)
