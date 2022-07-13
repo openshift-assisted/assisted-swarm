@@ -9,6 +9,7 @@ import logging
 import json
 import subprocess
 import base64
+import tempfile
 from collections import OrderedDict
 import requests
 import os
@@ -213,6 +214,36 @@ class Swarm(RetryingStateMachine):
             ]
         )
 
+        self.logging.info("Creating service account token")
+
+        with tempfile.NamedTemporaryFile(mode="w") as f:
+            json.dump(
+                {
+                    "apiVersion": "v1",
+                    "kind": "Secret",
+                    "type": "kubernetes.io/service-account-token",
+                    "metadata": {
+                        "name": f"{self.identifier}-sa-token",
+                        "namespace": "default",
+                        "annotations": {
+                            "kubernetes.io/service-account.name": self.identifier,
+                        },
+                    },
+                },
+                f,
+            )
+
+            f.flush()
+
+            self.executor.check_call(
+                [
+                    "oc",
+                    "apply",
+                    "-f",
+                    f.name
+                ]
+            )
+
         return next_state
 
     def create_cluserrolebinding(self, next_state):
@@ -232,29 +263,6 @@ class Swarm(RetryingStateMachine):
 
     def retrieve_serviceaccount_credentials(self, next_state):
         self.logging.info("Retrieving service account credentials")
-        # Get service account secrets list
-        service_accounts = self.executor.check_output(
-            [
-                "kubectl",
-                "get",
-                "sa",
-                "--namespace=default",
-                self.identifier,
-                "-ojson",
-            ]
-        )
-
-        service_accounts = json.loads(service_accounts)
-
-        try:
-            secret_name = next(
-                secret["name"]
-                for secret in service_accounts["secrets"]
-                if secret["name"].startswith(f"{self.identifier}-token-")
-            )
-        except StopIteration:
-            logging.info("Service account doesn't list the token secret yet")
-            return self.state
 
         secret = self.executor.check_output(
             [
@@ -262,7 +270,7 @@ class Swarm(RetryingStateMachine):
                 "get",
                 "secret",
                 "--namespace=default",
-                secret_name,
+                f"{self.identifier}-sa-token",
                 "-ojson",
             ]
         )
