@@ -48,7 +48,7 @@ def main(max_concurrent, test_plan, service_config):
 
             execute_plan(agents_taskpool, clusters_taskpool, test_plan, swarm)
 
-    swarm.logging.info(f"All clusters finished, exiting")
+    swarm.logging.info("All clusters finished, exiting")
     swarm.finalize()
 
 

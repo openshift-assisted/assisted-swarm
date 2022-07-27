@@ -84,7 +84,7 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
         )
 
         assert (
-            cluster_config.single_node == False or cluster_config.num_workers == 0
+            cluster_config.single_node is False or cluster_config.num_workers == 0
         ), "Cannot have single node with workers"
 
         self.num_control_plane = 1 if cluster_config.single_node else 3

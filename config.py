@@ -38,7 +38,7 @@ def validate_service_config(service_config):
         pull_secret = json.load(f)
         if "auths" not in pull_secret:
             raise Exception("Pull secret must have an 'auths' field")
-    
+
     if "release_image" not in service_config:
         raise Exception("Service config must have a 'release_image' field")
 
@@ -62,4 +62,3 @@ def load_config(service_config, test_plan):
     validate_test_plan(test_plan)
 
     return pull_secret, service_config, test_plan
-

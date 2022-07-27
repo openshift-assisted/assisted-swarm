@@ -10,7 +10,6 @@ import json
 import subprocess
 import base64
 import tempfile
-from collections import OrderedDict
 import requests
 import os
 
@@ -89,7 +88,7 @@ class Swarm(RetryingStateMachine):
                 }
             ),
             logging=self.logging,
-            name=f"Swarm",
+            name="Swarm",
         )
 
     def copy_fake_coreos_installer(self, next_state):
@@ -122,7 +121,7 @@ class Swarm(RetryingStateMachine):
             dir=self.swarm_dir,
             prefix="test_system_podman_config_",
         ) as container_config:
-            self.logging.info(f"Validating system podman lock config")
+            self.logging.info("Validating system podman lock config")
             podman_env = {"CONTAINERS_CONF": str(container_config)}
             podman_command = self.executor.prepare_sudo_command(["podman", "run", "ubi8/ubi"], env=podman_env)
 

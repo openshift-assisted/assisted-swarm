@@ -1,8 +1,6 @@
 import logging
-import os
 import re
 import requests
-import subprocess
 import uuid
 import json
 import tempfile
@@ -12,7 +10,6 @@ from typing import List
 
 from collections import OrderedDict
 from dataclasses import dataclass
-from pathlib import Path
 from statemachine import RetryingStateMachine
 from swarmexecutor import SwarmExecutor
 from swarmkubecache import SwarmKubeCache
