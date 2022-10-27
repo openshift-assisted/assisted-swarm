@@ -4,8 +4,9 @@ to mess up the machine it's running on - so you should probably run it in a disp
 
 (The potenal destructiveness stems from the fact that we're running a lot of
 actual parallel OCP Assisted installations, except we're skipping the
-destructive parts. But I can't guarantee that the skipping is perfect, so this
-warning stays here even though technically it should be safe)
+destructive parts by utilizing the agent/installer/controller dry run mode. But
+we can't guarantee that the dry run mode does perfect skipping, so this warning
+stays here even though technically it should be safe)
 
 # What is this
 This is a tool to launch a swarm of asssisted installer agents (and their corresponding cluster CRs)
