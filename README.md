@@ -2,6 +2,11 @@
 Although the code in this repo tries its best to be non-destructive, it has a big potential
 to mess up the machine it's running on - so you should probably run it in a disposable VM.
 
+(The potenal destructiveness stems from the fact that we're running a lot of
+actual parallel OCP Assisted installations, except we're skipping the
+destructive parts. But I can't guarantee that the skipping is perfect, so this
+warning stays here even though technically it should be safe)
+
 # What is this
 This is a tool to launch a swarm of asssisted installer agents (and their corresponding cluster CRs)
 that look to the service like actual cluster host agents, all the way from discovery/bmh to completed
