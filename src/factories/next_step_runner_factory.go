@@ -91,7 +91,7 @@ func (n *nextStepRunner) Run() (stdout, stderr string, exitCode int) {
 		logSenderCfg:  n.logSenderCfg,
 		log:           n.log,
 	}
-	commands.ProcessSteps(ctx, n.agentCfg, factory, &wg, n.log)
+	commands.ProcessSteps(ctx, cancel, n.agentCfg, factory, &wg, n.log)
 	return "", "", 0
 }
 

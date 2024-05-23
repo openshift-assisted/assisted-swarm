@@ -206,7 +206,7 @@ func (a *installRunner) pathExists(path string) bool {
 }
 
 func (a *installRunner) Run() (stdout, stderr string, exitCode int) {
-	if err := installer.RunInstaller(a.installConfig, a.log); err != nil {
+	if err := installer.RunInstaller(a.installConfig,  a.log.(*logrus.Logger)); err != nil {
 		return "", err.Error(), -1
 	}
 	return "", "", 0

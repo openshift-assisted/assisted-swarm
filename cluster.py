@@ -106,6 +106,10 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
         ip_index = agent_index + 1
         return f"10.123.{ip_index >> 8}.{ip_index & 0xff}/16"
 
+    def agent_ipv6(self, agent_index):
+        ip_index = agent_index + 1
+        return "2620:52:0:1b2:faf2:1eff:feb2:{:04x}/64".format(ip_index)
+
     def hostname(self, agent_index):
         return f"{self.identifier}-{agent_index}"
 
@@ -118,6 +122,7 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
             {
                 "hostname": self.hostname(agent_index),
                 "ip": self.agent_ip(agent_index),
+                "ipv6": self.agent_ipv6(agent_index),
                 "rebootMarkerPath": str(self.dry_reboot_marker(agent_index)),
             }
             for agent_index in range(self.total_agents)
@@ -228,6 +233,7 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
                     index=agent_index,
                     mac_address=self.make_mac(self.cluster_config.index, agent_index),
                     machine_ip=self.agent_ip(agent_index),
+                    machine_ipv6=self.agent_ipv6(agent_index),
                     machine_hostname=self.hostname(agent_index),
                     cluster_identifier=self.identifier,
                     cluster_dir=self.cluster_dir,

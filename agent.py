@@ -60,6 +60,7 @@ class ClusterAgentConfig:
     identifier: str
     machine_hostname: str
     machine_ip: str
+    machine_ipv6: str
     cluster_identifier: str
     cluster_dir: Path
     cluster_hosts: List[dict]
@@ -260,6 +261,8 @@ class Agent(RetryingStateMachine, WithContainerConfigs):
             cluster_hosts_file.write(json.dumps(self.cluster_agent_config.cluster_hosts))
             cluster_hosts_file_path = cluster_hosts_file.name
 
+        self.logging.info(f"swarm_agent_config.agent_image_path: {self.swarm_agent_config.agent_image_path}")
+
         new_agent_params = assisted_swarm.NewAgentParams(
             service_url=self.service_url,
             infra_env_id=self.infraenv_id,
@@ -275,9 +278,11 @@ class Agent(RetryingStateMachine, WithContainerConfigs):
             # The installer needs to know all the hostnames in the cluster
             dry_cluster_hosts_path=cluster_hosts_file_path,
             dry_forced_host_ipv4=self.cluster_agent_config.machine_ip,
+            dry_forced_host_ipv6=self.cluster_agent_config.machine_ipv6
         )
 
         response = self.swarm_agent_config.swarm_client.create_new_agent(new_agent_params=new_agent_params)
+        self.logging.info(f"response: {response}")
         try:
             return next_state if self.wait_for_completion(response.id) else self.state
         finally:
