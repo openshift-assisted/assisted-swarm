@@ -1,9 +1,6 @@
 ASSISTED_SWARM = build/assisted-swarm
-CONTAINER_COMMAND := $(or $(CONTAINER_COMMAND),docker)
+CONTAINER_COMMAND := podman-remote
 IMAGE := $(or $(IMAGE),quay.io/oamizur/assisted-swarm:latest)
-ifeq ($(CONTAINER_COMMAND), docker)
-	CONTAINER_COMMAND = $(shell docker -v | cut -f1 -d' ' | tr '[:upper:]' '[:lower:]')
-endif
 
 .PHONY: build-image generate clean
 

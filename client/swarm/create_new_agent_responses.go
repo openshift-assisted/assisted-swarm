@@ -63,7 +63,8 @@ func NewCreateNewAgentCreated() *CreateNewAgentCreated {
 	return &CreateNewAgentCreated{}
 }
 
-/* CreateNewAgentCreated describes a response with status code 201, with default header values.
+/*
+CreateNewAgentCreated describes a response with status code 201, with default header values.
 
 Success.
 */
@@ -71,9 +72,39 @@ type CreateNewAgentCreated struct {
 	Payload *models.Agent
 }
 
+// IsSuccess returns true when this create new agent created response has a 2xx status code
+func (o *CreateNewAgentCreated) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this create new agent created response has a 3xx status code
+func (o *CreateNewAgentCreated) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this create new agent created response has a 4xx status code
+func (o *CreateNewAgentCreated) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this create new agent created response has a 5xx status code
+func (o *CreateNewAgentCreated) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this create new agent created response a status code equal to that given
+func (o *CreateNewAgentCreated) IsCode(code int) bool {
+	return code == 201
+}
+
 func (o *CreateNewAgentCreated) Error() string {
 	return fmt.Sprintf("[POST /agents][%d] createNewAgentCreated  %+v", 201, o.Payload)
 }
+
+func (o *CreateNewAgentCreated) String() string {
+	return fmt.Sprintf("[POST /agents][%d] createNewAgentCreated  %+v", 201, o.Payload)
+}
+
 func (o *CreateNewAgentCreated) GetPayload() *models.Agent {
 	return o.Payload
 }
@@ -95,7 +126,8 @@ func NewCreateNewAgentBadRequest() *CreateNewAgentBadRequest {
 	return &CreateNewAgentBadRequest{}
 }
 
-/* CreateNewAgentBadRequest describes a response with status code 400, with default header values.
+/*
+CreateNewAgentBadRequest describes a response with status code 400, with default header values.
 
 Error.
 */
@@ -103,9 +135,39 @@ type CreateNewAgentBadRequest struct {
 	Payload *models.Error
 }
 
+// IsSuccess returns true when this create new agent bad request response has a 2xx status code
+func (o *CreateNewAgentBadRequest) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this create new agent bad request response has a 3xx status code
+func (o *CreateNewAgentBadRequest) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this create new agent bad request response has a 4xx status code
+func (o *CreateNewAgentBadRequest) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this create new agent bad request response has a 5xx status code
+func (o *CreateNewAgentBadRequest) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this create new agent bad request response a status code equal to that given
+func (o *CreateNewAgentBadRequest) IsCode(code int) bool {
+	return code == 400
+}
+
 func (o *CreateNewAgentBadRequest) Error() string {
 	return fmt.Sprintf("[POST /agents][%d] createNewAgentBadRequest  %+v", 400, o.Payload)
 }
+
+func (o *CreateNewAgentBadRequest) String() string {
+	return fmt.Sprintf("[POST /agents][%d] createNewAgentBadRequest  %+v", 400, o.Payload)
+}
+
 func (o *CreateNewAgentBadRequest) GetPayload() *models.Error {
 	return o.Payload
 }
@@ -127,7 +189,8 @@ func NewCreateNewAgentUnauthorized() *CreateNewAgentUnauthorized {
 	return &CreateNewAgentUnauthorized{}
 }
 
-/* CreateNewAgentUnauthorized describes a response with status code 401, with default header values.
+/*
+CreateNewAgentUnauthorized describes a response with status code 401, with default header values.
 
 Unauthorized.
 */
@@ -135,9 +198,39 @@ type CreateNewAgentUnauthorized struct {
 	Payload *models.Error
 }
 
+// IsSuccess returns true when this create new agent unauthorized response has a 2xx status code
+func (o *CreateNewAgentUnauthorized) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this create new agent unauthorized response has a 3xx status code
+func (o *CreateNewAgentUnauthorized) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this create new agent unauthorized response has a 4xx status code
+func (o *CreateNewAgentUnauthorized) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this create new agent unauthorized response has a 5xx status code
+func (o *CreateNewAgentUnauthorized) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this create new agent unauthorized response a status code equal to that given
+func (o *CreateNewAgentUnauthorized) IsCode(code int) bool {
+	return code == 401
+}
+
 func (o *CreateNewAgentUnauthorized) Error() string {
 	return fmt.Sprintf("[POST /agents][%d] createNewAgentUnauthorized  %+v", 401, o.Payload)
 }
+
+func (o *CreateNewAgentUnauthorized) String() string {
+	return fmt.Sprintf("[POST /agents][%d] createNewAgentUnauthorized  %+v", 401, o.Payload)
+}
+
 func (o *CreateNewAgentUnauthorized) GetPayload() *models.Error {
 	return o.Payload
 }
@@ -159,7 +252,8 @@ func NewCreateNewAgentForbidden() *CreateNewAgentForbidden {
 	return &CreateNewAgentForbidden{}
 }
 
-/* CreateNewAgentForbidden describes a response with status code 403, with default header values.
+/*
+CreateNewAgentForbidden describes a response with status code 403, with default header values.
 
 Forbidden.
 */
@@ -167,9 +261,39 @@ type CreateNewAgentForbidden struct {
 	Payload *models.Error
 }
 
+// IsSuccess returns true when this create new agent forbidden response has a 2xx status code
+func (o *CreateNewAgentForbidden) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this create new agent forbidden response has a 3xx status code
+func (o *CreateNewAgentForbidden) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this create new agent forbidden response has a 4xx status code
+func (o *CreateNewAgentForbidden) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this create new agent forbidden response has a 5xx status code
+func (o *CreateNewAgentForbidden) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this create new agent forbidden response a status code equal to that given
+func (o *CreateNewAgentForbidden) IsCode(code int) bool {
+	return code == 403
+}
+
 func (o *CreateNewAgentForbidden) Error() string {
 	return fmt.Sprintf("[POST /agents][%d] createNewAgentForbidden  %+v", 403, o.Payload)
 }
+
+func (o *CreateNewAgentForbidden) String() string {
+	return fmt.Sprintf("[POST /agents][%d] createNewAgentForbidden  %+v", 403, o.Payload)
+}
+
 func (o *CreateNewAgentForbidden) GetPayload() *models.Error {
 	return o.Payload
 }
@@ -191,7 +315,8 @@ func NewCreateNewAgentInternalServerError() *CreateNewAgentInternalServerError {
 	return &CreateNewAgentInternalServerError{}
 }
 
-/* CreateNewAgentInternalServerError describes a response with status code 500, with default header values.
+/*
+CreateNewAgentInternalServerError describes a response with status code 500, with default header values.
 
 Error.
 */
@@ -199,9 +324,39 @@ type CreateNewAgentInternalServerError struct {
 	Payload *models.Error
 }
 
+// IsSuccess returns true when this create new agent internal server error response has a 2xx status code
+func (o *CreateNewAgentInternalServerError) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this create new agent internal server error response has a 3xx status code
+func (o *CreateNewAgentInternalServerError) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this create new agent internal server error response has a 4xx status code
+func (o *CreateNewAgentInternalServerError) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this create new agent internal server error response has a 5xx status code
+func (o *CreateNewAgentInternalServerError) IsServerError() bool {
+	return true
+}
+
+// IsCode returns true when this create new agent internal server error response a status code equal to that given
+func (o *CreateNewAgentInternalServerError) IsCode(code int) bool {
+	return code == 500
+}
+
 func (o *CreateNewAgentInternalServerError) Error() string {
 	return fmt.Sprintf("[POST /agents][%d] createNewAgentInternalServerError  %+v", 500, o.Payload)
 }
+
+func (o *CreateNewAgentInternalServerError) String() string {
+	return fmt.Sprintf("[POST /agents][%d] createNewAgentInternalServerError  %+v", 500, o.Payload)
+}
+
 func (o *CreateNewAgentInternalServerError) GetPayload() *models.Error {
 	return o.Payload
 }

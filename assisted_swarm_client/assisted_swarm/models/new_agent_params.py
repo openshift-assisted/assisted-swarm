@@ -40,6 +40,7 @@ class NewAgentParams(object):
         'containers_storage_conf': 'str',
         'dry_forced_host_id': 'str',
         'dry_forced_host_ipv4': 'str',
+        'dry_forced_host_ipv6': 'str',
         'dry_forced_mac_address': 'str',
         'dry_forced_hostname': 'str',
         'dry_fake_reboot_marker_path': 'str',
@@ -56,13 +57,14 @@ class NewAgentParams(object):
         'containers_storage_conf': 'containers_storage_conf',
         'dry_forced_host_id': 'dry_forced_host_id',
         'dry_forced_host_ipv4': 'dry_forced_host_ipv4',
+        'dry_forced_host_ipv6': 'dry_forced_host_ipv6',
         'dry_forced_mac_address': 'dry_forced_mac_address',
         'dry_forced_hostname': 'dry_forced_hostname',
         'dry_fake_reboot_marker_path': 'dry_fake_reboot_marker_path',
         'dry_cluster_hosts_path': 'dry_cluster_hosts_path'
     }
 
-    def __init__(self, service_url=None, infra_env_id=None, agent_version=None, cacert=None, pull_secret=None, containers_conf=None, containers_storage_conf=None, dry_forced_host_id=None, dry_forced_host_ipv4=None, dry_forced_mac_address=None, dry_forced_hostname=None, dry_fake_reboot_marker_path=None, dry_cluster_hosts_path=None):  # noqa: E501
+    def __init__(self, service_url=None, infra_env_id=None, agent_version=None, cacert=None, pull_secret=None, containers_conf=None, containers_storage_conf=None, dry_forced_host_id=None, dry_forced_host_ipv4=None, dry_forced_host_ipv6=None, dry_forced_mac_address=None, dry_forced_hostname=None, dry_fake_reboot_marker_path=None, dry_cluster_hosts_path=None):  # noqa: E501
         """NewAgentParams - a model defined in Swagger"""  # noqa: E501
 
         self._service_url = None
@@ -74,6 +76,7 @@ class NewAgentParams(object):
         self._containers_storage_conf = None
         self._dry_forced_host_id = None
         self._dry_forced_host_ipv4 = None
+        self._dry_forced_host_ipv6 = None
         self._dry_forced_mac_address = None
         self._dry_forced_hostname = None
         self._dry_fake_reboot_marker_path = None
@@ -98,6 +101,8 @@ class NewAgentParams(object):
             self.dry_forced_host_id = dry_forced_host_id
         if dry_forced_host_ipv4 is not None:
             self.dry_forced_host_ipv4 = dry_forced_host_ipv4
+        if dry_forced_host_ipv6 is not None:
+            self.dry_forced_host_ipv6 = dry_forced_host_ipv6
         if dry_forced_mac_address is not None:
             self.dry_forced_mac_address = dry_forced_mac_address
         if dry_forced_hostname is not None:
@@ -295,6 +300,27 @@ class NewAgentParams(object):
         """
 
         self._dry_forced_host_ipv4 = dry_forced_host_ipv4
+
+    @property
+    def dry_forced_host_ipv6(self):
+        """Gets the dry_forced_host_ipv6 of this NewAgentParams.  # noqa: E501
+
+
+        :return: The dry_forced_host_ipv6 of this NewAgentParams.  # noqa: E501
+        :rtype: str
+        """
+        return self._dry_forced_host_ipv6
+
+    @dry_forced_host_ipv6.setter
+    def dry_forced_host_ipv6(self, dry_forced_host_ipv6):
+        """Sets the dry_forced_host_ipv6 of this NewAgentParams.
+
+
+        :param dry_forced_host_ipv6: The dry_forced_host_ipv6 of this NewAgentParams.  # noqa: E501
+        :type: str
+        """
+
+        self._dry_forced_host_ipv6 = dry_forced_host_ipv6
 
     @property
     def dry_forced_mac_address(self):

@@ -1,15 +1,33 @@
-FROM registry.ci.openshift.org/openshift/release:golang-1.17
-ENV GO111MODULE=on
-ENV GOFLAGS=""
+FROM registry.ci.openshift.org/openshift/release:golang-1.20 AS golang
+RUN chmod g+xw -R /usr/local/go
 
-COPY --from=quay.io/goswagger/swagger:v0.28.0 /usr/bin/swagger /usr/bin/goswagger
+FROM quay.io/centos/centos:stream9
+
+ENV GOPATH=/go
+ENV GOROOT=/usr/local/go
+ENV VIRTUAL_ENV=/opt/venv
+# A directory in the path with write permission even for non-root users
+ENV TOOLS=/tools/
+ENV PATH="$VIRTUAL_ENV/bin:$GOROOT/bin:$GOPATH/bin:$TOOLS:$PATH"
+
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/bin v1.53.2
+COPY --from=quay.io/goswagger/swagger:sha-5d0a00d /usr/bin/swagger /usr/bin/goswagger
+
 COPY --from=quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18 /opt/swagger-codegen-cli /opt/swagger-codegen-cli
+COPY --from=golang /usr/bin/gotestsum /usr/bin/make /usr/bin/
+COPY --from=golang /usr/local/go /usr/local/go
+COPY --from=quay.io/openshift/origin-cli:latest /usr/bin/oc /usr/bin
+COPY --from=quay.io/operator-framework/upstream-opm-builder:v1.16.1 /bin/opm /bin
+COPY --from=registry.k8s.io/kustomize/kustomize:v4.3.0 /app/kustomize /usr/bin/
+COPY --from=quay.io/coreos/shellcheck-alpine:v0.5.0 /bin/shellcheck /usr/bin/shellcheck
 
 USER 0
-
 RUN curl -L https://github.com/stoplightio/spectral/releases/download/v5.9.1/spectral-linux -o /usr/local/bin/spectral && chmod +x /usr/local/bin/spectral
 
-RUN yum install -y --setopt=skip_missing_names_on_install=False docker podman
-RUN mkdir build && chmod g+xw -R build/
+COPY ./hack/setup_env.sh ./
+RUN ./setup_env.sh podman_remote && \
+    dnf clean all
 
-RUN chmod g+xw -R .
+
+
+

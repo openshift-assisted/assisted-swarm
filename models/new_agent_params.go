@@ -45,6 +45,10 @@ type NewAgentParams struct {
 	// Pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[\/]([1-9]|[1-2][0-9]|3[0-2]?)$
 	DryForcedHostIPV4 string `json:"dry_forced_host_ipv4,omitempty"`
 
+	// dry forced host ipv6
+	// Pattern: ^((([0-9A-Fa-f]{1,4}:){1,6}:)|(([0-9A-Fa-f]{1,4}:){7}))([0-9A-Fa-f]{1,4}?)[\/]([0-9]*)$
+	DryForcedHostIPV6 string `json:"dry_forced_host_ipv6,omitempty"`
+
 	// dry forced hostname
 	DryForcedHostname string `json:"dry_forced_hostname,omitempty"`
 
@@ -72,6 +76,10 @@ func (m *NewAgentParams) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateDryForcedHostIPV4(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateDryForcedHostIPV6(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -107,6 +115,18 @@ func (m *NewAgentParams) validateDryForcedHostIPV4(formats strfmt.Registry) erro
 	}
 
 	if err := validate.Pattern("dry_forced_host_ipv4", "body", m.DryForcedHostIPV4, `^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[\/]([1-9]|[1-2][0-9]|3[0-2]?)$`); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *NewAgentParams) validateDryForcedHostIPV6(formats strfmt.Registry) error {
+	if swag.IsZero(m.DryForcedHostIPV6) { // not required
+		return nil
+	}
+
+	if err := validate.Pattern("dry_forced_host_ipv6", "body", m.DryForcedHostIPV6, `^((([0-9A-Fa-f]{1,4}:){1,6}:)|(([0-9A-Fa-f]{1,4}:){7}))([0-9A-Fa-f]{1,4}?)[\/]([0-9]*)$`); err != nil {
 		return err
 	}
 

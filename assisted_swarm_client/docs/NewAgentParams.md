@@ -12,6 +12,7 @@ Name | Type | Description | Notes
 **containers_storage_conf** | **str** |  | [optional] 
 **dry_forced_host_id** | **str** |  | [optional] 
 **dry_forced_host_ipv4** | **str** |  | [optional] 
+**dry_forced_host_ipv6** | **str** |  | [optional] 
 **dry_forced_mac_address** | **str** |  | [optional] 
 **dry_forced_hostname** | **str** |  | [optional] 
 **dry_fake_reboot_marker_path** | **str** |  | [optional] 
