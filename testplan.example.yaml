@@ -1,32 +1,11 @@
 # See the schema at the bottom of this file for a formal definition of its structure
 clusters:
   # Run 2 single-node clusters
-  - single_node: true
-    num_workers: 0
-    amount: 2
-
-  # Run a single 3-control-plane 3-worker cluster
   - single_node: false
     num_workers: 3
     amount: 1
-
-  # Run 2 3-control-plane 10-worker clusters on the Sun
-  - single_node: false
-    num_workers: 10
-    amount: 2
-    infranev_labels:
-      agentclusterinstalls.extensions.hive.openshift.io/location: Sun
-
-  # Run a single compact cluster infraenv on the moon with nmstate, but don't bind to any cluster
-  - single_node: false
-    num_workers: 0
-    with_nmstate: true
-    just_infraenv: true
-    infranev_labels:
-      agentclusterinstalls.extensions.hive.openshift.io/location: Moon
-    amount: 1
 # Run the clusters in the clusters list in random order rather than the listed order
-shuffle: true
+shuffle: false
 # -------------- End of user configuration --------------
 
 # -------------- Configuration Schema -------------------

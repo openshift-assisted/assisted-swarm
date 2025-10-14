@@ -23,7 +23,7 @@ spec:
     - cidr: {{ machine_network }}
     {% endif %}
     serviceNetwork:
-    - 172.30.0.0/16
+    - 172.30.0.0/22
   {% if not single_node %}
   apiVIP: {{ api_vip }}
   ingressVIP: {{ ingress_vip }}

@@ -3,7 +3,7 @@ import waiting
 from swarmexecutor import SwarmExecutor
 from assisted_swarm_client.assisted_swarm import SwarmApi
 
-DEFAULT_AGENT_IMAGE = "quay.io/oamizur/assisted-swarm:latest"
+DEFAULT_AGENT_IMAGE = "quay.io/otuchfel/assisted-swarm:latest"
 DEFAULT_STDOUT_FILE = "/tmp/combined-agent.stdout"
 DEFAULT_STDERR_FILE = "/tmp/combined-agent.stderr"
 
@@ -46,6 +46,8 @@ class CombinedAgent:
                    "/sys/bus:/host/sys/bus:ro",
                    "-v",
                    "/sys/class:/host/sys/class:ro",
+                   "-v",
+                   "/sys/class:/sys/class:ro",
                    "-v",
                    "/run/udev:/host/run/udev:ro",
                    "-v",

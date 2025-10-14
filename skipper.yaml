@@ -1,5 +1,6 @@
 registry: quay.io
 build-container-image: assisted-swarm-build
+build-container-net: host
 
 volumes:
   # cache

@@ -39,9 +39,11 @@ def main(max_concurrent, test_plan, service_config):
             swarm = Swarm(
                 pull_secret=pull_secret,
                 pull_secret_file=service_config["pull_secret_file"],
+                service_mode=service_config["service_mode"],
                 service_url=service_config["service_endpoint"],
                 release_image=service_config["release_image"],
                 ssh_pub_key=service_config["ssh_pub_key"],
+                controller_image_override=service_config.get("controller_image_override"),
             )
 
             swarm.start()

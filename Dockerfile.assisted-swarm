@@ -1,4 +1,4 @@
-FROM quay.io/centos/centos:stream8
+FROM quay.io/centos/centos:stream10
 
 ARG WORK_DIR=/data
 
@@ -8,4 +8,7 @@ RUN chmod ug+x /usr/local/bin/dry-installer
 COPY ./build/assisted-swarm /assisted-swarm
 ENV GODEBUG=madvdontneed=1
 ENV GOGC=50
+
+RUN dnf install nmap util-linux -y
+
 CMD ["/assisted-swarm"]

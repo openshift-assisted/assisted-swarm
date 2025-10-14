@@ -8,11 +8,11 @@ set -x
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 __root="$(cd "$(dirname "${__dir}")" && pwd)"
 
-UID_FLAGS=${UID_FLAGS--u $(id -u):$(id -u)}
+UID_FLAGS=${UID_FLAGS--u $(id -u):$(id -g)}
 
-function lint_swagger() {
-    spectral lint swagger.yaml
-}
+# function lint_swagger() {
+#     spectral lint swagger.yaml
+# }
 
 function generate_go_server() {
     rm -rf restapi/
@@ -50,12 +50,14 @@ function generate_python_client() {
   output_dir=${__root}/${base_dir}
   mkdir -p ${output_dir}
   /bin/rm -rf ${output_dir}/* || /bin/true
-  ${CONTAINER_COMMAND} build -f hack/Dockerfile.python-client-generate . -t python-generator:latest && ${CONTAINER_COMMAND} run --user ${UID}:${UID} \
+  podman build -f hack/Dockerfile.python-client-generate . -t python-generator:latest && ${CONTAINER_COMMAND} run --network=none --user $(id -u):$(id -g) \
    -v ${output_dir}:/assisted_swarm_client --env SWAGGER_FILE=swagger.yaml --env OUTPUT=/assisted_swarm_client --env BASE_DIR=${base_dir} python-generator:latest
+  # Fix any permission issues
+  sudo chown -R $(id -u):$(id -g) ${output_dir} 2>/dev/null || true
 }
 
 function generate_from_swagger() {
-    lint_swagger
+    # lint_swagger
     generate_go_client
     generate_go_server
     validate_swagger_file

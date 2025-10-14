@@ -28,6 +28,12 @@ def validate_test_plan(test_plan):
 
 
 def validate_service_config(service_config):
+    if "service_mode" not in service_config:
+        raise Exception("Service config must have a 'service_mode' field")
+
+    if service_config["service_mode"] not in ["saas", "k8s"]:
+        raise Exception("Service mode must be either 'saas' or 'k8s'")
+
     if "service_endpoint" not in service_config:
         raise Exception("Service config must have a 'service_endpoint' field")
 

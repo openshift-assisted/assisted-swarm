@@ -44,10 +44,13 @@ bad_lock_return_code = 125
 
 
 class Swarm(RetryingStateMachine):
-    def __init__(self, pull_secret, pull_secret_file, service_url, release_image, ssh_pub_key):
+    def __init__(self, pull_secret, pull_secret_file, service_mode, service_url, release_image, ssh_pub_key, controller_image_override: str | None):
         self.ssh_pub_key = ssh_pub_key
+        self.controller_image_override = controller_image_override
         self.pull_secret = pull_secret
         self.pull_secret_file = pull_secret_file
+        self.pull_secret_token: str = self.extract_pull_secret_token(self.pull_secret)
+        self.service_mode = service_mode
         self.service_url = service_url
         self.release_image = release_image
         self.logging = logging.getLogger("swarm")
@@ -70,6 +73,7 @@ class Swarm(RetryingStateMachine):
                     "Validating system podman lock config": self.validate_system_podman_lock_config,
                     "Killing previous swarm": self.kill_previous_swarm,
                     "Deleting previous swarm storage": self.delete_previous_swarm_storage,
+                    "Retrieving ocm token": self.get_ocm_token,
                     "Creating service account": self.create_serviceaccount,
                     "Creating clusterrolebinding": self.create_cluserrolebinding,
                     "Retrieving service account credentials": self.retrieve_serviceaccount_credentials,
@@ -90,6 +94,18 @@ class Swarm(RetryingStateMachine):
             logging=self.logging,
             name="Swarm",
         )
+
+    @staticmethod
+    def extract_pull_secret_token(pull_secret: str) -> str:
+        # we only want the auth of cloud.openshift.com
+        pull_secret_json = json.loads(pull_secret)
+        auths = pull_secret_json.get("auths", {})
+        try:
+            cloud = auths["cloud.openshift.com"]
+        except KeyError:
+            raise RuntimeError("pull secret does not contain auth for cloud.openshift.com")
+
+        return cloud.get("auth", "")
 
     def copy_fake_coreos_installer(self, next_state):
         self.executor.check_call(["sudo", "cp", str(script_dir / "dry-installer"), "/usr/local/bin/"])
@@ -118,7 +134,7 @@ class Swarm(RetryingStateMachine):
             system_container_config,
             env=[],
             num_locks=num_locks,
-            dir=self.swarm_dir,
+            dir=str(self.swarm_dir),
             prefix="test_system_podman_config_",
         ) as container_config:
             self.logging.info("Validating system podman lock config")
@@ -150,6 +166,10 @@ class Swarm(RetryingStateMachine):
         return next_state
 
     def create_ca_cert(self, next_state):
+        if self.service_mode == "saas":
+            self.ca_cert_path = Path("")
+            return next_state
+
         self.ca_cert_path = self.swarm_dir / "ca.crt"
         with open(self.ca_cert_path, "w") as ca_cert_file:
             ca_cert_file.write(self.ca_cert)
@@ -162,26 +182,30 @@ class Swarm(RetryingStateMachine):
         return next_state
 
     def precache_service_images(self, next_state):
+        if self.service_mode == "saas":
+            return next_state
+
         images_to_precache = {
             "discovery-agent",
             "assisted-installer",
             "assisted-installer-controller",
+            "controller-override",
         }
 
         with ContainerStorageConfigWithGraphroot(
             system_container_storage_config,
             self.shared_graphroot,
-            dir=self.swarm_dir,
+            dir=str(self.swarm_dir),
             prefix="precache_container_storage_config_",
         ) as shared_graphroot_conf:
             with ContainerConfigWithEnvAndNumLocks(
                 system_container_config,
                 env=[],
                 num_locks=num_locks,
-                dir=self.swarm_dir,
+                dir=str(self.swarm_dir),
                 prefix="precache_container_config_",
             ) as container_config:
-                for image, url in self.service_image_urls.items():
+                for image, url in self.service_image_urls.items() + [("controller-override", self.controller_image_override)]:
                     if image in images_to_precache:
                         self.logging.info(f"Pre-caching {image} image")
 
@@ -202,6 +226,9 @@ class Swarm(RetryingStateMachine):
         return self.state
 
     def create_serviceaccount(self, next_state):
+        if self.service_mode == "saas":
+            return next_state
+
         self.logging.info("Creating service account")
         self.executor.check_call(
             [
@@ -246,6 +273,9 @@ class Swarm(RetryingStateMachine):
         return next_state
 
     def create_cluserrolebinding(self, next_state):
+        if self.service_mode == "saas":
+            return next_state
+
         self.logging.info("Creating clusterrolebinding")
         self.executor.check_call(
             [
@@ -260,7 +290,33 @@ class Swarm(RetryingStateMachine):
 
         return next_state
 
+    def get_ocm_token(self, next_state):
+        if self.service_mode != "saas":
+            self.ocm_token = "dummy-token"
+            return next_state
+
+        self.logging.info("Retrieving ocm token")
+
+        secret = self.executor.check_output(
+            [
+                "sudo",
+                "-u",
+                os.environ["SUDO_USER"],
+                "ocm",
+                "token"
+            ]
+        )
+
+        self.ocm_token = secret.decode("utf-8").strip()
+
+        return next_state
+
     def retrieve_serviceaccount_credentials(self, next_state):
+        if self.service_mode == "saas":
+            self.token = ""
+            self.k8s_api_server_url = ""
+            return next_state
+
         self.logging.info("Retrieving service account credentials")
 
         secret = self.executor.check_output(
@@ -320,13 +376,15 @@ class Swarm(RetryingStateMachine):
                 system_container_config,
                 env=[],
                 num_locks=num_locks,
-                dir=self.swarm_dir,
+                dir=str(self.swarm_dir),
                 prefix="precache_container_config_",
             ) as container_config:
                 podman_command = [
                     "podman",
                     "run",
                     "--privileged",
+                    "--authfile",
+                    self.pull_secret_file,
                     "--rm",
                     "-v",
                     f"{agent_binary_dir}:/hostbin",
@@ -367,7 +425,8 @@ class Swarm(RetryingStateMachine):
     def get_image_urls_from_service(self, next_state):
         resp = requests.get(
             f"{self.service_url}/api/assisted-install/v2/component-versions",
-            verify=False,
+            headers={"Authorization": f"Bearer {self.ocm_token}"},
+            # verify=False,
         )
 
         resp.raise_for_status()
@@ -409,6 +468,7 @@ class Swarm(RetryingStateMachine):
     ):
         cluster = Cluster(
             ClusterConfig(
+                ocm_token=self.ocm_token,
                 logging=self.logging,
                 single_node=single_node,
                 with_nmstate=with_nmstate,
@@ -418,24 +478,30 @@ class Swarm(RetryingStateMachine):
                 storage_dir=self.swarm_dir,
                 ssh_pub_key=self.ssh_pub_key,
                 pull_secret=self.pull_secret,
+                pull_secret_token=self.pull_secret_token,
                 task_pool=task_pool,
-                controller_image_path=self.service_image_urls["assisted-installer-controller"],
+                controller_image_path=self.service_image_urls["assisted-installer-controller"] if self.controller_image_override is None else self.controller_image_override,
                 index=index,
                 release_image=self.release_image,
                 swarm_identifier=self.identifier,
                 num_locks=num_locks,
+                service_mode=self.service_mode,
                 service_url=self.service_url,
                 kube_cache=self.kube_cache,
                 executor=self.executor,
                 shared_graphroot=self.shared_graphroot,
                 can_start_agents=can_start_agents,
                 started_all_agents=started_all_agents,
+                pull_secret_file=self.pull_secret_file,
             ),
             SwarmAgentConfig(
+                ocm_token=self.ocm_token,
                 agent_binary=self.agent_bin,
                 agent_image_path=self.service_image_urls["discovery-agent"],
                 ca_cert_path=self.ca_cert_path,
                 pull_secret=self.pull_secret,
+                pull_secret_token=self.pull_secret_token,
+                service_mode=self.service_mode,
                 service_url=self.service_url,
                 shared_storage=self.shared_graphroot,
                 ssh_pub_key=self.ssh_pub_key,

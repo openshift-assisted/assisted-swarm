@@ -16,8 +16,8 @@ const (
 )
 
 func main() {
-	util.SetLogging("combined-agent", false, true, MainDummyHostID)
-	failOnError := func(err error, msg string, args ...interface{}) {
+	util.SetLogging("combined-agent", false, true, true, MainDummyHostID)
+	failOnError := func(err error, msg string, args ...any) {
 		if err != nil {
 			logrus.WithError(err).Fatalf(msg, args...)
 		}

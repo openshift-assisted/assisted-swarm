@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 from collections import OrderedDict
 
+import requests
+
 from agent import ClusterAgentConfig, SwarmAgentConfig, Agent
 from dataclasses import dataclass
 from logging import Logger
@@ -22,6 +24,7 @@ from typing import Dict
 
 @dataclass
 class ClusterConfig:
+    ocm_token: str
     controller_image_path: str
     logging: Logger
     single_node: bool
@@ -29,10 +32,12 @@ class ClusterConfig:
     index: int
     swarm_identifier: str
     storage_dir: Path
+    service_mode: str
     service_url: str
     release_image: str
     ssh_pub_key: str
     pull_secret: str
+    pull_secret_token: str
     kube_cache: SwarmKubeCache
     task_pool: TaskPool
     num_locks: int
@@ -43,6 +48,7 @@ class ClusterConfig:
     with_nmstate: bool
     just_infraenv: bool
     infraenv_labels: Dict[str, str]
+    pull_secret_file: str
 
 
 class Cluster(RetryingStateMachine, WithContainerConfigs):
@@ -53,11 +59,16 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
             states=OrderedDict(
                 {
                     "Initializing": self.initialize,
+                    "Creating cluster": self.create_cluster,
+                    "Creating infraenv": self.create_infraenv,
                     "Generating manifests": self.generate_manifests,
                     "Applying manifests": self.apply_manifests,
                     "Launching agents": self.launch_agents,
                     "Waiting for AgentClusterInstall clusterMetadata infraID": self.wait_for_agentclusterinstall_cluster_metadata_infraid,
+                    "Waiting for cluster ready": self.wait_for_cluster_ready,
+                    "Triggering cluster install": self.trigger_cluster_install,
                     "Generating container configurations": self.create_container_configs,
+                    "Wait for agents to have roles": self.wait_for_agents_to_have_roles_assigned,
                     "Running controller": self.run_controller,
                     "Wait for agents to complete": self.wait_for_agents,
                     "Done": self.done,
@@ -104,7 +115,8 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
 
     def agent_ip(self, agent_index):
         ip_index = agent_index + 1
-        return f"10.123.{ip_index >> 8}.{ip_index & 0xff}/16"
+        # return f"10.123.{ip_index >> 8}.{ip_index & 0xff}/16"
+        return f"10.123.{ip_index >> 8}.{ip_index & 0xff}/22"
 
     def hostname(self, agent_index):
         return f"{self.identifier}-{agent_index}"
@@ -142,7 +154,73 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
         )
         return ":".join(f"{o:02x}" for o in octets)
 
+    def create_cluster(self, next_state):
+        resp = requests.post(
+            f"{self.cluster_config.service_url}/api/assisted-install/v2/clusters",
+            headers={"Authorization": f"Bearer {self.cluster_config.ocm_token}"},
+            json={
+                "name": self.identifier,
+                "openshift_version": self.cluster_config.release_image.split(":")[-1].split("-")[0],
+                "pull_secret": self.cluster_config.pull_secret,
+                "high_availability_mode": "None" if self.cluster_config.single_node else "Full",
+                "base_dns_domain": "example.com",
+                "user_managed_networking": False,
+                "ssh_public_key": self.cluster_config.ssh_pub_key,
+                "api_vips": [
+                    {
+                        # "ip": "10.123.255.253",
+                        "ip": "10.123.3.253",
+                    },
+                ],
+                "ingress_vips": [
+                    {
+                        # "ip": "10.123.255.254",
+                        "ip": "10.123.3.254",
+                    },
+                ],
+                "control_plane_count": self.num_control_plane,
+            },
+        )
+        self.logging.info(f"Create cluster response: {resp.status_code} {resp.text}")
+        resp.raise_for_status()
+
+        cluster_data = resp.json()
+        self.cluster_id = cluster_data["id"]
+
+        self.logging.info(f"Created cluster {self.identifier} in service")
+        return next_state
+
+    def create_infraenv(self, next_state):
+        resp = requests.post(
+            f"{self.cluster_config.service_url}/api/assisted-install/v2/infra-envs",
+            headers={"Authorization": f"Bearer {self.cluster_config.ocm_token}"},
+            json={
+                "name": self.identifier,
+                "pull_secret": self.cluster_config.pull_secret,
+                "ssh_authorized_key": self.cluster_config.ssh_pub_key,
+                "cluster_id": self.cluster_id,
+                "cpu_architecture": "x86_64",
+                "image_type": "minimal-iso",
+            },
+        )
+
+        self.logging.info(f"Create infraenv response: {resp.status_code} {resp.text}")
+
+        resp.raise_for_status()
+
+        infraenv_data = resp.json()
+
+        self.infraenv_id = infraenv_data["id"]
+
+        self.logging.info(f"Created infraenv {self.identifier} in service")
+
+        return next_state
+
+
     def generate_manifests(self, next_state):
+        if self.cluster_config.service_mode != "k8s":
+            return next_state
+
         per_cluster_manifests = [
             "namespace",
             "secret_pull",
@@ -168,7 +246,7 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
 
         template_params = {
             "release_image": self.cluster_config.release_image,
-            "machine_network": "10.123.0.0/16",
+            "machine_network": "10.123.0.0/22",
             "ssh_pub_key": self.cluster_config.ssh_pub_key,
             "pull_secret_b64": base64.b64encode(self.cluster_config.pull_secret.encode("utf-8")).decode("utf-8"),
             "num_control_plane": self.num_control_plane,
@@ -177,8 +255,8 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
             "single_node": self.cluster_config.single_node,
             "just_infraenv": self.cluster_config.just_infraenv,
             "infraenv_labels": json.dumps(self.cluster_config.infraenv_labels, separators=(",", ":")),
-            "api_vip": "10.123.255.253",
-            "ingress_vip": "10.123.255.254",
+            "api_vip": "10.123.3.253",
+            "ingress_vip": "10.123.3.254",
         }
 
         all_rendered_manifests = []
@@ -208,6 +286,9 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
         return next_state
 
     def apply_manifests(self, next_state):
+        if self.cluster_config.service_mode != "k8s":
+            return next_state
+
         subprocess.run(["oc", "apply", "-f", "-"], input=self.manifests.encode("utf-8"), check=True)
 
         return next_state
@@ -235,6 +316,7 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
                     cluster_hosts=self.cluster_hosts,
                     agent_dir=self.agent_directory(agent_index),
                     fake_reboot_marker_path=self.dry_reboot_marker(agent_index),
+                    infraenv_id=self.infraenv_id,
                 ),
             )
             for agent_index in range(self.total_agents)
@@ -249,14 +331,41 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
 
         return next_state
 
+    def wait_for_agents_to_have_roles_assigned(self, next_state):
+        if self.cluster_config.service_mode != "saas":
+            return next_state
+
+        resp = requests.get(
+            f"{self.cluster_config.service_url}/api/assisted-install/v2/clusters/{self.cluster_id}?with_hosts=true",
+            headers={"Authorization": f"Bearer {self.cluster_config.ocm_token}"},
+        )
+        resp.raise_for_status()
+        cluster_data = resp.json()
+        hosts = cluster_data.get("hosts", [])
+        if len(hosts) < self.total_agents:
+            self.logging.info(f"Waiting for all agents to register, have {len(hosts)}/{self.total_agents}")
+            return self.state
+
+        roles_assigned = all("role" in host and host["role"] in ("master", "worker") for host in hosts)
+        if not roles_assigned:
+            self.logging.info("Waiting for all agents to have roles assigned")
+            return self.state
+
+        self.first_non_bootstrap_master = next(agent for agent in self.agents if agent.identifier == json.loads(next(
+            host for host in hosts if host.get("role") == "master" and not host.get("bootstrap", False)
+        )["inventory"])["hostname"])
+
+        return next_state
+
     def run_controller(self, next_state):
         podman_environment = {
             "CONTAINERS_CONF": str(self.container_config),
-            "CONTAINERS_STORAGE_CONF": str(self.container_storage_conf),
+            # "CONTAINERS_STORAGE_CONF": str(self.container_storage_conf),
         }
 
-        # Arbitrarily choose the first agent's reboot marker path as a signal for the controller that it should start
-        fake_reboot_marker_path = self.agents[0].fake_reboot_marker_path
+        # Arbitrarily choose the first non-bootstrap master's reboot marker path as a signal for the controller that
+        # it should start
+        fake_reboot_marker_path = self.first_non_bootstrap_master.fake_reboot_marker_path
 
         with tempfile.NamedTemporaryFile(
             mode="w", delete=False, dir=Path("/var/log/"), prefix="controller_cluster_hosts_"
@@ -265,27 +374,33 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
             cluster_hosts_file_path = cluster_hosts_file.name
 
         controller_environment = {
-            "CLUSTER_ID": self.infra_id,
+            "CLUSTER_ID": self.cluster_id,
             "DRY_ENABLE": "true",
             "INVENTORY_URL": self.cluster_config.service_url,
-            "PULL_SECRET_TOKEN": self.cluster_config.pull_secret,
+            "PULL_SECRET_TOKEN": self.cluster_config.pull_secret_token,
             "OPENSHIFT_VERSION": 4.9,  # TODO: Make this configurable? Does it matter in any way?
             "DRY_FAKE_REBOOT_MARKER_PATH": str(fake_reboot_marker_path),
             "SKIP_CERT_VERIFICATION": "true",
             "HIGH_AVAILABILITY_MODE": "false",
             "CHECK_CLUSTER_VERSION": "true",
             "DRY_CLUSTER_HOSTS_PATH": cluster_hosts_file_path,
+            "DEBUG": "1",
         }
 
         controller_mounts = {str(fake_reboot_marker_path.parent): str(fake_reboot_marker_path.parent)}
 
+        controller_ports = {2345}  # For debugging
+
         podman_command = [
             "podman",
             "run",
+            "--authfile",
+            self.cluster_config.pull_secret_file,
             "--net=host",
             "--pid=host",
             "--privileged",
             "-it",
+            *(f"-p={port}:{port}" for port in controller_ports),
             *(f"-e={var}={value}" for var, value in controller_environment.items()),
             *(f"-v={host_path}:{container_path}" for host_path, container_path in controller_mounts.items()),
             self.cluster_config.controller_image_path,
@@ -317,6 +432,10 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
         return next_state
 
     def wait_for_agentclusterinstall_cluster_metadata_infraid(self, next_state):
+        # In k8s the only reasonable way for us to get the cluster ID is through this field
+        if self.cluster_config.service_mode != "k8s":
+            return next_state
+
         agent_cluster_install = self.cluster_config.kube_cache.get_agent_cluster_install(
             namespace=self.identifier, name=self.identifier
         )
@@ -327,13 +446,57 @@ class Cluster(RetryingStateMachine, WithContainerConfigs):
             if not infra_id:
                 return self.state
 
-            self.infra_id = infra_id
+            self.cluster_id = infra_id
 
             return next_state
 
         self.logging.info(f"Waiting for agent cluster install {self.identifier}/{self.identifier} to be created")
 
         return self.state
+
+    def wait_for_cluster_ready(self, next_state):
+        if self.cluster_config.service_mode != "saas":
+            return next_state
+
+        resp = requests.get(
+            f"{self.cluster_config.service_url}/api/assisted-install/v2/clusters/{self.cluster_id}",
+            headers={"Authorization": f"Bearer {self.cluster_config.ocm_token}"},
+        )
+        
+        if not resp.ok:
+            self.logging.error(f"Failed to get cluster status: {resp.status_code} {resp.text}")
+            return self.state
+            
+        cluster_data = resp.json()
+        cluster_status = cluster_data.get("status", "")
+        
+        self.logging.info(f"Cluster {self.cluster_id} status: {cluster_status}")
+        
+        if cluster_status == "ready":
+            return next_state
+        elif cluster_status in ["error", "cancelled"]:
+            self.logging.error(f"Cluster is in error state: {cluster_status}")
+            return self.state
+        else:
+            return self.state
+
+    def trigger_cluster_install(self, next_state):
+        if self.cluster_config.service_mode != "saas":
+            return next_state
+
+        self.logging.info(f"Triggering installation for cluster {self.cluster_id}")
+        
+        resp = requests.post(
+            f"{self.cluster_config.service_url}/api/assisted-install/v2/clusters/{self.cluster_id}/actions/install",
+            headers={"Authorization": f"Bearer {self.cluster_config.ocm_token}"},
+        )
+        
+        if not resp.ok:
+            self.logging.error(f"Failed to trigger cluster install: {resp.status_code} {resp.text}")
+            return self.state
+            
+        self.logging.info(f"Successfully triggered installation for cluster {self.cluster_id}")
+        return next_state
 
     def done(self, _):
         return self.state

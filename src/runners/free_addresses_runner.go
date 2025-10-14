@@ -29,7 +29,7 @@ func (a *freeAddressesRunner) validate() error {
 }
 
 func (a *freeAddressesRunner) Run() (stdout, stderr string, exitCode int) {
-	return free_addresses.GetFreeAddresses(a.args[0], &free_addresses.ProcessExecuter{}, logrus.StandardLogger())
+	return free_addresses.GetFreeAddresses(a.args[0], &free_addresses.ProcessExecuter{}, logrus.StandardLogger(), true)
 }
 
 func (a *freeAddressesRunner) Command() string {

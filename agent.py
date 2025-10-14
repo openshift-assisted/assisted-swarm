@@ -6,7 +6,7 @@ import json
 import tempfile
 import waiting
 from pathlib import Path
-from typing import List
+from typing import List, Any
 
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -36,6 +36,8 @@ class SwarmAgentConfig:
     token: str
     ssh_pub_key: str
     pull_secret: str
+    pull_secret_token: str
+    service_mode: str
     service_url: str
     shared_storage: Path
     executor: SwarmExecutor
@@ -45,6 +47,7 @@ class SwarmAgentConfig:
     kube_cache: SwarmKubeCache
     num_locks: int
     swarm_client: SwarmApi
+    ocm_token: str
 
 
 @dataclass
@@ -61,6 +64,7 @@ class ClusterAgentConfig:
     machine_hostname: str
     machine_ip: str
     cluster_identifier: str
+    infraenv_id: str
     cluster_dir: Path
     cluster_hosts: List[dict]
     agent_dir: Path
@@ -84,6 +88,7 @@ class Agent(RetryingStateMachine, WithContainerConfigs):
                 {
                     "Initializing": self.initialize,
                     "Waiting for ISO URL on InfraEnv": self.wait_iso_url_infraenv,
+                    "Waiting for ISO URL on InfraEnv": self.wait_iso_url_infraenv_saas,
                     'Seting BMH provisioning state to "ready"': self.ready_bmh,
                     "Waiting for ISO URL on BMH": self.wait_iso_url_bmh,
                     "Download ISO": self.download_iso,
@@ -135,7 +140,7 @@ class Agent(RetryingStateMachine, WithContainerConfigs):
 
     def download_iso(self, next_state):
         self.swarm_agent_config.executor.check_call(
-            ["curl", "--insecure", "--silent", "--show-error", "--output", "/dev/null", self.bmh_iso_url]
+            ["curl", "--insecure", "--silent", "--show-error", "--output", "/dev/null", self.infraenv_iso_url]
         )
 
         return next_state
@@ -150,7 +155,29 @@ class Agent(RetryingStateMachine, WithContainerConfigs):
 
         raise RuntimeError("Could not find infraenv ID from url")
 
+    def wait_iso_url_infraenv_saas(self, next_state):
+        infraenv = requests.get(
+            f"{self.swarm_agent_config.service_url}/api/assisted-install/v2/infra-envs/{self.cluster_agent_config.infraenv_id}",
+            headers={"Authorization": f"Bearer {self.swarm_agent_config.ocm_token}"},
+        )
+
+        infraenv.raise_for_status()
+
+        iso_url = infraenv.json().get("download_url", "")
+        if iso_url == "":
+            self.logging.info("Infraenv download_url is empty")
+            return self.state
+
+        self.logging.info(f"Infraenv download_url found {iso_url}")
+        self.infraenv_iso_url = iso_url
+        self.infraenv_id = self.cluster_agent_config.infraenv_id
+
+        return next_state
+
     def wait_iso_url_infraenv(self, next_state):
+        if self.swarm_agent_config.service_mode != "k8s":
+            return next_state
+
         infraenv = self.swarm_agent_config.kube_cache.get_infraenv(
             namespace=self.cluster_agent_config.cluster_identifier, name=self.cluster_agent_config.cluster_identifier
         )
@@ -176,6 +203,9 @@ class Agent(RetryingStateMachine, WithContainerConfigs):
         return self.state
 
     def wait_iso_url_bmh(self, next_state):
+        if self.swarm_agent_config.service_mode != "k8s":
+            return next_state
+
         baremetalhost = self.swarm_agent_config.kube_cache.get_baremetalhost(
             namespace=self.cluster_agent_config.cluster_identifier, name=self.identifier
         )
@@ -229,12 +259,18 @@ class Agent(RetryingStateMachine, WithContainerConfigs):
         return False
 
     def ready_bmh(self, next_state):
+        if self.swarm_agent_config.service_mode != "k8s":
+            return next_state
+
         if self.set_bmh_provisioning_state("ready"):
             return next_state
 
         return self.state
 
     def provisioned_bmh(self, next_state):
+        if self.swarm_agent_config.service_mode != "k8s":
+            return next_state
+
         if self.set_bmh_provisioning_state("provisioned"):
             return next_state
 
@@ -242,7 +278,7 @@ class Agent(RetryingStateMachine, WithContainerConfigs):
 
     def wait_for_completion(self, id):
         def has_agent_completed():
-            response = self.swarm_agent_config.swarm_client.get_agent(id)
+            response: Any = self.swarm_agent_config.swarm_client.get_agent(id)
             return response.status == AgentStatus.TERMINATED
         try:
             waiting.wait(has_agent_completed,
@@ -264,10 +300,11 @@ class Agent(RetryingStateMachine, WithContainerConfigs):
             service_url=self.service_url,
             infra_env_id=self.infraenv_id,
             agent_version=self.swarm_agent_config.agent_image_path,
-            cacert=str(self.swarm_agent_config.ca_cert_path),
+            # cacert=str(self.swarm_agent_config.ca_cert_path),
+            cacert="/tmp/dummy",
             containers_conf=str(self.container_config),
             containers_storage_conf=str(self.container_storage_conf),
-            pull_secret=self.swarm_agent_config.pull_secret,
+            pull_secret=self.swarm_agent_config.pull_secret_token,
             dry_forced_host_id=self.host_id,
             dry_forced_mac_address=self.cluster_agent_config.mac_address,
             dry_fake_reboot_marker_path=str(self.fake_reboot_marker_path),
@@ -277,7 +314,7 @@ class Agent(RetryingStateMachine, WithContainerConfigs):
             dry_forced_host_ipv4=self.cluster_agent_config.machine_ip,
         )
 
-        response = self.swarm_agent_config.swarm_client.create_new_agent(new_agent_params=new_agent_params)
+        response: Any = self.swarm_agent_config.swarm_client.create_new_agent(new_agent_params=new_agent_params)
         try:
             return next_state if self.wait_for_completion(response.id) else self.state
         finally:

@@ -1,5 +1,8 @@
+# running against saas assisted or k8s assisted?
+service_mode: "saas"
+
 # The endpoint the service listens on 
-service_endpoint: "https://assisted-service-open-cluster-management.apps.jetlag-ibm0.performance-scale.cloud"
+service_endpoint: "https://api.openshift.com"
 
 # A public key. This doesn't make any difference, you can leave it as is
 ssh_pub_key: "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBLK6KYdjOHpuDxS6wFG8ts/7X6nPTHHfsXxN34PGY/HCEAwHSgw6ShWIwcqueGfR9kgPGdClWZrX25MdnF3d+6Y= swarm@swarm"
@@ -8,4 +11,6 @@ ssh_pub_key: "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNT
 pull_secret_file: "/home/omer/omer-ps"
 
 # Swarm cluster release image
-release_image: "quay.io/openshift-release-dev/ocp-release:4.9.7-x86_64"
+release_image: "quay.io/openshift-release-dev/ocp-release:4.19.9-x86_64"
+
+controller_image_override: "quay.io/otuchfel/assisted-installer-controller:latest-debug"

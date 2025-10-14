@@ -96,7 +96,6 @@ func (a *installRunner) merge() error {
 	a.installConfig.ClusterID = a.installParams.ClusterID.String()
 	a.installConfig.HostID = a.installParams.HostID.String()
 	a.installConfig.Device = swag.StringValue(a.installParams.BootDevice)
-	a.installConfig.HighAvailabilityMode = swag.StringValue(a.installParams.HighAvailabilityMode)
 	a.installConfig.ControllerImage = swag.StringValue(a.installParams.ControllerImage)
 	a.installConfig.MCOImage = a.installParams.McoImage
 	a.installConfig.MustGatherImage = a.installParams.MustGatherImage
@@ -206,7 +205,11 @@ func (a *installRunner) pathExists(path string) bool {
 }
 
 func (a *installRunner) Run() (stdout, stderr string, exitCode int) {
-	if err := installer.RunInstaller(a.installConfig, a.log); err != nil {
+	logger, ok := a.log.(*logrus.Logger)
+	if !ok {
+		return "", "log is not a *logrus.Logger", -1
+	}
+	if err := installer.RunInstaller(a.installConfig, logger); err != nil {
 		return "", err.Error(), -1
 	}
 	return "", "", 0

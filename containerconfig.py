@@ -2,7 +2,7 @@ from adjustedtoml import AdjustedToml
 from typing import List
 
 
-system_container_storage_config = r"/etc/containers/storage.conf"
+system_container_storage_config = r"/usr/share/containers/storage.conf"
 system_container_config = r"/usr/share/containers/containers.conf"
 
 
